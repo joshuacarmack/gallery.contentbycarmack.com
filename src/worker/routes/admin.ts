@@ -181,6 +181,11 @@ adminApi.patch('/galleries/:id', async (c) => {
     if (String(e).includes('UNIQUE')) return badRequest('slug already in use');
     throw e;
   }
+  if ('zip_includes_subs' in body) {
+    // Nesting membership of the gallery-level zip just changed; the previously
+    // built zip (if any) no longer reflects which photos it should contain.
+    await markZipStale(c.env.DB, id, null);
+  }
   return c.json({ ok: true });
 });
 
@@ -471,11 +476,12 @@ adminApi.post('/galleries/:id/zips/rebuild', async (c) => {
     .map((r) => r.subgallery_id as string);
   const needsGalleryLevel = rootCount > 0 || (gallery.zip_includes_subs === 1 && totalCount > 0);
 
-  // Create any missing rows (as stale).
+  // Create any missing rows, and force existing rows back to stale — a manual
+  // rebuild is an explicit request to regenerate, regardless of prior status.
   if (needsGalleryLevel) {
     await c.env.DB.prepare(
       `INSERT INTO zips (id, gallery_id, subgallery_id, status) VALUES (?, ?, NULL, 'stale')
-       ON CONFLICT (gallery_id) WHERE subgallery_id IS NULL DO NOTHING`,
+       ON CONFLICT (gallery_id) WHERE subgallery_id IS NULL DO UPDATE SET status = 'stale'`,
     )
       .bind(nanoid(21), galleryId)
       .run();
@@ -483,7 +489,7 @@ adminApi.post('/galleries/:id/zips/rebuild', async (c) => {
   for (const subId of neededSubs) {
     await c.env.DB.prepare(
       `INSERT INTO zips (id, gallery_id, subgallery_id, status) VALUES (?, ?, ?, 'stale')
-       ON CONFLICT (gallery_id, subgallery_id) DO NOTHING`,
+       ON CONFLICT (gallery_id, subgallery_id) DO UPDATE SET status = 'stale'`,
     )
       .bind(nanoid(21), galleryId, subId)
       .run();
