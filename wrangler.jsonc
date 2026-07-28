@@ -49,8 +49,8 @@
 		// Cloudflare Access team domain + application AUD, used to verify the
 		// Cf-Access-Jwt-Assertion header on /admin/* and /api/admin/*.
 		// Leave ACCESS_TEAM_DOMAIN empty in local dev to bypass verification.
-		"ACCESS_TEAM_DOMAIN": "",
-		"ACCESS_AUD": ""
+		"ACCESS_TEAM_DOMAIN": "jcarmack.cloudflareaccess.com",
+		"ACCESS_AUD": "2e929fe250eb5d4dcee5599b8ff739d89a59255e7669ed41b684c58e22e1c06b"
 	},
 	// Secrets (set with `wrangler secret put`):
 	//   COOKIE_SECRET — HMAC key for gallery session cookies
