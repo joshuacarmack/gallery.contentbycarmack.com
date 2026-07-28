@@ -29,6 +29,10 @@ export function GalleryEditor() {
       {detail.photos.length > 0 && (
         <div className="card">
           <h2>Photos — gallery root ({detail.photos.length})</h2>
+          <p className="muted" style={{ marginTop: '-0.4rem', fontSize: '0.85rem' }}>
+            Select one photo and “Set as splash image” to choose the full-screen photo shown before
+            clients enter the gallery.
+          </p>
           <AdminPhotoGrid
             photos={detail.photos}
             bucketUrl={detail.bucket_url}
@@ -61,6 +65,7 @@ function SettingsCard({ detail, onSaved }: { detail: AdminGalleryDetail; onSaved
   const [title, setTitle] = useState(detail.title);
   const [slug, setSlug] = useState(detail.slug);
   const [description, setDescription] = useState(detail.description ?? '');
+  const [shootDate, setShootDate] = useState(detail.shoot_date ?? '');
   const [password, setPassword] = useState(detail.password ?? '');
   const [includeSubs, setIncludeSubs] = useState(detail.zip_includes_subs === 1);
   const [saving, setSaving] = useState(false);
@@ -75,6 +80,7 @@ function SettingsCard({ detail, onSaved }: { detail: AdminGalleryDetail; onSaved
         title,
         slug,
         description: description || null,
+        shoot_date: shootDate || null,
         password: password || null,
         zip_includes_subs: includeSubs,
       });
@@ -101,6 +107,15 @@ function SettingsCard({ detail, onSaved }: { detail: AdminGalleryDetail; onSaved
       <div className="field">
         <label>Description</label>
         <textarea className="input" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Shoot date (shown on the splash page, optional)</label>
+        <input
+          className="input"
+          type="date"
+          value={shootDate}
+          onChange={(e) => setShootDate(e.target.value)}
+        />
       </div>
       <div className="field">
         <label>Password (blank = anyone with the link)</label>

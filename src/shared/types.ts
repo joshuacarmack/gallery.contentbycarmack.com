@@ -31,6 +31,8 @@ export interface PublicGallery {
   slug: string;
   title: string;
   description: string | null;
+  shoot_date: string | null;
+  cover_photo_id: string | null;
   bucket_url: string;
   subgalleries: SubgalleryCard[];
   photos: PhotoInfo[]; // root-level photos
@@ -83,6 +85,7 @@ export interface AdminGalleryDetail {
   slug: string;
   title: string;
   description: string | null;
+  shoot_date: string | null;
   password: string | null;
   cover_photo_id: string | null;
   zip_includes_subs: number;

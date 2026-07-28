@@ -7,18 +7,32 @@ import { Loading, NotFound, PasswordGate } from './PasswordGate';
 import { JustifiedGrid } from './JustifiedGrid';
 import { Lightbox } from './Lightbox';
 import { ZipButton } from './ZipButton';
+import { Splash } from './Splash';
 
 export function GalleryPage() {
   const { gallery: slug = '' } = useParams();
   const fetcher = useCallback(() => api.gallery(slug), [slug]);
   const { state, reload, submitPassword } = useProtectedGallery<PublicGallery>(slug, fetcher);
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [entered, setEntered] = useState(false);
 
   if (state.kind === 'loading') return <Loading />;
   if (state.kind === 'notfound') return <NotFound />;
   if (state.kind === 'locked') return <PasswordGate title={state.title} onSubmit={submitPassword} />;
 
   const g = state.data;
+
+  if (!entered) {
+    return (
+      <Splash
+        title={g.title}
+        shootDate={g.shoot_date}
+        coverUrl={g.cover_photo_id ? `${g.bucket_url}/p/${g.cover_photo_id}/f.jpg` : null}
+        onEnter={() => setEntered(true)}
+      />
+    );
+  }
+
   return (
     <div className="page">
       <header className="gallery-header">

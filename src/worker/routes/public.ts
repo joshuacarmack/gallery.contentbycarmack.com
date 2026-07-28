@@ -20,6 +20,8 @@ interface GalleryRow {
   slug: string;
   title: string;
   description: string | null;
+  shoot_date: string | null;
+  cover_photo_id: string | null;
   password: string | null;
   zip_includes_subs: number;
 }
@@ -35,7 +37,7 @@ interface ZipRow {
 async function getLiveGallery(db: D1Database, slug: string): Promise<GalleryRow | null> {
   return db
     .prepare(
-      `SELECT id, slug, title, description, password, zip_includes_subs
+      `SELECT id, slug, title, description, shoot_date, cover_photo_id, password, zip_includes_subs
        FROM galleries WHERE slug = ? AND deleted_at IS NULL`,
     )
     .bind(slug)
@@ -131,6 +133,8 @@ publicApi.get('/:slug', async (c) => {
     slug: gallery.slug,
     title: gallery.title,
     description: gallery.description,
+    shoot_date: gallery.shoot_date,
+    cover_photo_id: gallery.cover_photo_id,
     bucket_url: c.env.PUBLIC_BUCKET_URL,
     subgalleries: subs.results,
     photos: rootPhotos.results,

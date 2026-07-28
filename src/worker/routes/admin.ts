@@ -160,6 +160,10 @@ adminApi.patch('/galleries/:id', async (c) => {
     sets.push('cover_photo_id = ?');
     vals.push(typeof body.cover_photo_id === 'string' ? body.cover_photo_id : null);
   }
+  if ('shoot_date' in body) {
+    sets.push('shoot_date = ?');
+    vals.push(typeof body.shoot_date === 'string' && body.shoot_date !== '' ? body.shoot_date : null);
+  }
   if ('zip_includes_subs' in body) {
     sets.push('zip_includes_subs = ?');
     vals.push(body.zip_includes_subs ? 1 : 0);

@@ -51,7 +51,7 @@ export function AdminPhotoGrid({ photos, bucketUrl, onDeleted, onSetGalleryCover
           </span>
           {single && (
             <button className="btn btn-sm" onClick={() => onSetGalleryCover(single)}>
-              Set as gallery cover
+              Set as splash image
             </button>
           )}
           {single && onSetSubCover && (
