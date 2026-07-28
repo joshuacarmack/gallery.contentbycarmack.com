@@ -1,50 +1,62 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "cbc-gallery",
-  "main": "src/worker/index.ts",
-  "compatibility_date": "2026-07-27",
-  "compatibility_flags": ["nodejs_compat"],
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "cbc-gallery",
+	"main": "src/worker/index.ts",
+	"compatibility_date": "2026-07-27",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	// All requests hit the Worker first so it can verify Cloudflare Access on
+	// /admin/* HTML and stamp X-Robots-Tag on every public response (§12).
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application",
+		"run_worker_first": true
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "cbc-gallery",
+			"database_id": "9cee6c48-08a8-4cac-a70d-461bf4e55e1b",
+			"migrations_dir": "migrations"
+		}
+	],
+	"r2_buckets": [
+		{
+			"bucket_name": "cbc-gallery",
+			"binding": "BUCKET"
+		}
+	],
+	"queues": {
+		"producers": [
+			{
+				"binding": "ZIP_QUEUE",
+				"queue": "cbc-gallery-zips"
+			}
+		],
+		"consumers": [
+			{
+				"queue": "cbc-gallery-zips",
+				"max_batch_size": 1,
+				"max_retries": 3
+			}
+		]
+	},
 
-  // All requests hit the Worker first so it can verify Cloudflare Access on
-  // /admin/* HTML and stamp X-Robots-Tag on every public response (§12).
-  "assets": {
-    "directory": "./dist",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": true
-  },
-
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "cbc-gallery",
-      // Placeholder — replace with the real ID from `wrangler d1 create cbc-gallery`.
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "migrations"
-    }
-  ],
-
-  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "cbc-gallery" }],
-
-  "queues": {
-    "producers": [{ "binding": "ZIP_QUEUE", "queue": "cbc-gallery-zips" }],
-    "consumers": [
-      { "queue": "cbc-gallery-zips", "max_batch_size": 1, "max_retries": 3 }
-    ]
-  },
-
-  "vars": {
-    "PUBLIC_BUCKET_URL": "https://cdn.gallery.contentbycarmack.com",
-    // Cloudflare Access team domain + application AUD, used to verify the
-    // Cf-Access-Jwt-Assertion header on /admin/* and /api/admin/*.
-    // Leave ACCESS_TEAM_DOMAIN empty in local dev to bypass verification.
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
-  },
-
-  // Secrets (set with `wrangler secret put`):
-  //   COOKIE_SECRET — HMAC key for gallery session cookies
-
-  "observability": { "enabled": true, "head_sampling_rate": 1 },
-  "workers_dev": false
+	"vars": {
+		"PUBLIC_BUCKET_URL": "https://cdn.gallery.contentbycarmack.com",
+		// Cloudflare Access team domain + application AUD, used to verify the
+		// Cf-Access-Jwt-Assertion header on /admin/* and /api/admin/*.
+		// Leave ACCESS_TEAM_DOMAIN empty in local dev to bypass verification.
+		"ACCESS_TEAM_DOMAIN": "",
+		"ACCESS_AUD": ""
+	},
+	// Secrets (set with `wrangler secret put`):
+	//   COOKIE_SECRET — HMAC key for gallery session cookies
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"workers_dev": false
 }
