@@ -7,10 +7,17 @@ import { handleZipBatch, type ZipJob } from './zip-consumer';
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Keep client galleries out of search engines (§12).
+// Keep client galleries out of search engines (§12). Responses from the
+// assets binding have immutable headers, so re-wrap before setting.
 app.use('*', async (c, next) => {
   await next();
-  c.res.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  try {
+    c.res.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  } catch {
+    const res = new Response(c.res.body, c.res);
+    res.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    c.res = res;
+  }
 });
 
 app.onError((err, c) => {
