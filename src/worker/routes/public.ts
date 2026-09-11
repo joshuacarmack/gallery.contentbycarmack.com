@@ -152,16 +152,19 @@ publicApi.get('/:slug/:sub', async (c) => {
   }
 
   const sub = await c.env.DB.prepare(
-    `SELECT id, slug, title FROM subgalleries
+    `SELECT id, slug, title, cover_photo_id FROM subgalleries
      WHERE gallery_id = ? AND slug = ? AND deleted_at IS NULL`,
   )
     .bind(gallery.id, c.req.param('sub'))
-    .first<{ id: string; slug: string; title: string }>();
+    .first<{ id: string; slug: string; title: string; cover_photo_id: string | null }>();
   if (!sub) return c.json({ error: 'not_found' }, 404);
 
   const [photos, zip] = await Promise.all([
-    c.env.DB.prepare(`${PHOTO_SELECT} AND subgallery_id = ? ORDER BY filename`)
-      .bind(gallery.id, sub.id)
+    c.env.DB.prepare(
+      `${PHOTO_SELECT} AND subgallery_id = ?
+       ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, filename`,
+    )
+      .bind(gallery.id, sub.id, sub.cover_photo_id)
       .all<PhotoInfo>(),
     c.env.DB.prepare(
       `SELECT id, subgallery_id, status, size_bytes, photo_count
