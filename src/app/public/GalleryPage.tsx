@@ -9,12 +9,28 @@ import { Lightbox } from './Lightbox';
 import { ZipButton } from './ZipButton';
 import { Splash } from './Splash';
 
+function hasEnteredSplash(slug: string): boolean {
+  try {
+    return sessionStorage.getItem(`splash-entered:${slug}`) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markEnteredSplash(slug: string): void {
+  try {
+    sessionStorage.setItem(`splash-entered:${slug}`, '1');
+  } catch {
+    // ignore (e.g. storage disabled)
+  }
+}
+
 export function GalleryPage() {
   const { gallery: slug = '' } = useParams();
   const fetcher = useCallback(() => api.gallery(slug), [slug]);
   const { state, reload, submitPassword } = useProtectedGallery<PublicGallery>(slug, fetcher);
   const [lightbox, setLightbox] = useState<number | null>(null);
-  const [entered, setEntered] = useState(false);
+  const [entered, setEntered] = useState(() => hasEnteredSplash(slug));
 
   if (state.kind === 'loading') return <Loading />;
   if (state.kind === 'notfound') return <NotFound />;
@@ -28,7 +44,10 @@ export function GalleryPage() {
         title={g.title}
         shootDate={g.shoot_date}
         coverUrl={g.cover_photo_id ? `${g.bucket_url}/p/${g.cover_photo_id}/f.jpg` : null}
-        onEnter={() => setEntered(true)}
+        onEnter={() => {
+          markEnteredSplash(slug);
+          setEntered(true);
+        }}
       />
     );
   }
