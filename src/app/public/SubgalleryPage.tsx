@@ -7,6 +7,7 @@ import { Loading, NotFound, PasswordGate } from './PasswordGate';
 import { JustifiedGrid } from './JustifiedGrid';
 import { Lightbox } from './Lightbox';
 import { ZipButton } from './ZipButton';
+import { Footer } from './Footer';
 
 export function SubgalleryPage() {
   const { gallery: slug = '', sub = '' } = useParams();
@@ -44,6 +45,7 @@ export function SubgalleryPage() {
           onClose={() => setLightbox(null)}
         />
       )}
+      <Footer />
     </div>
   );
 }

@@ -150,6 +150,18 @@ img { display: block; }
 
 .page { max-width: 1400px; margin: 0 auto; padding: 0 0.75rem 4rem; }
 
+.site-footer {
+  max-width: 1400px;
+  margin: 2.5rem auto 0;
+  padding: 1.25rem 0.75rem 2rem;
+  border-top: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  text-align: center;
+}
+.site-footer a { color: var(--text-dim); text-decoration: underline; text-underline-offset: 2px; }
+.site-footer a:hover { color: var(--text); }
+
 .gallery-header {
   padding: 1.6rem 0.25rem 1.1rem;
   display: flex;

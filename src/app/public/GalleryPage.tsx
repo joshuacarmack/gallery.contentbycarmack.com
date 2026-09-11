@@ -8,6 +8,7 @@ import { JustifiedGrid } from './JustifiedGrid';
 import { Lightbox } from './Lightbox';
 import { ZipButton } from './ZipButton';
 import { Splash } from './Splash';
+import { Footer } from './Footer';
 
 function hasEnteredSplash(slug: string): boolean {
   try {
@@ -102,6 +103,7 @@ export function GalleryPage() {
           onClose={() => setLightbox(null)}
         />
       )}
+      <Footer />
     </div>
   );
 }

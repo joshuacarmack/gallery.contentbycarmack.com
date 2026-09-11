@@ -5,12 +5,14 @@ import './styles.css';
 import { GalleryPage } from './public/GalleryPage';
 import { SubgalleryPage } from './public/SubgalleryPage';
 import { AdminApp } from './admin/AdminApp';
+import { Footer } from './public/Footer';
 
 function Home() {
   return (
     <div className="center-screen">
       <div className="brand-mark">Content by Carmack</div>
       <p className="muted">Client galleries. Follow the link you were sent to view your photos.</p>
+      <Footer />
     </div>
   );
 }
