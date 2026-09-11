@@ -239,6 +239,59 @@ export async function runBatch(
   };
 }
 
+/** Uploads a dedicated splash-page image for a gallery: stored like a normal
+ *  photo (full + thumb) but tagged kind='splash', so it never shows up in the
+ *  photo grid, a ZIP, or any photo count — it's for the splash screen only. */
+export function uploadSplashImage(
+  galleryId: string,
+  file: File,
+  onProgress: (frac: number) => void,
+): Promise<{ id: string }> {
+  return new Promise((resolve, reject) => {
+    void (async () => {
+      const thumb = await makeThumb(file);
+      if (thumb.error || !thumb.thumb || !thumb.width || !thumb.height) {
+        reject(new Error(thumb.error ?? 'thumbnail failed'));
+        return;
+      }
+      const form = new FormData();
+      form.set('gallery_id', galleryId);
+      form.set('kind', 'splash');
+      form.set('width', String(thumb.width));
+      form.set('height', String(thumb.height));
+      form.set('file', file, file.name);
+      form.set('thumb', thumb.thumb, 't.jpg');
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/admin/photos');
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded / e.total);
+      };
+      xhr.onerror = () => reject(new Error('network error'));
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const body = JSON.parse(xhr.responseText) as { id?: string; skipped?: boolean };
+            if (!body.id) {
+              throw new Error(
+                body.skipped
+                  ? 'a splash image with that filename and size is already set for this gallery'
+                  : 'no id returned',
+              );
+            }
+            resolve({ id: body.id });
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error(String(e)));
+          }
+        } else {
+          reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText.slice(0, 200)}`));
+        }
+      };
+      xhr.send(form);
+    })();
+  });
+}
+
 /** Re-queue failed tasks for another run. */
 export function requeueFailed(tasks: UploadTask[]): void {
   for (const t of tasks) {

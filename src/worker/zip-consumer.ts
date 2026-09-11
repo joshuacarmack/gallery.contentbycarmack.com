@@ -138,7 +138,7 @@ async function buildZip(env: Env, zipId: string): Promise<void> {
       await env.DB.prepare(
         `SELECT a.id, a.filename, a.size_bytes, s.title AS sub_title FROM assets a
          LEFT JOIN subgalleries s ON s.id = a.subgallery_id
-         WHERE a.gallery_id = ? AND a.status = 'approved'
+         WHERE a.gallery_id = ? AND a.status = 'approved' AND a.kind = 'photo'
            AND (a.subgallery_id IS NULL OR s.deleted_at IS NULL)
          ORDER BY s.title, a.filename`,
       )
@@ -148,8 +148,9 @@ async function buildZip(env: Env, zipId: string): Promise<void> {
   } else {
     photos = (
       await env.DB.prepare(
+        // kind = 'photo' excludes dedicated splash images — never downloadable.
         `SELECT a.id, a.filename, a.size_bytes, NULL AS sub_title FROM assets a
-         WHERE a.gallery_id = ? AND a.subgallery_id IS NULL AND a.status = 'approved'
+         WHERE a.gallery_id = ? AND a.subgallery_id IS NULL AND a.status = 'approved' AND a.kind = 'photo'
          ORDER BY a.filename`,
       )
         .bind(zip.gallery_id)

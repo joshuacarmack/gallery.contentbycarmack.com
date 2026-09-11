@@ -75,8 +75,10 @@ function zipInfo(row: ZipRow | null | undefined): ZipInfo | null {
   };
 }
 
+// kind = 'photo' excludes dedicated splash images (see admin.ts) — those are
+// never meant to appear in a grid or a download.
 const PHOTO_SELECT = `SELECT id, filename, width, height, size_bytes FROM assets
-  WHERE gallery_id = ? AND status = 'approved'`;
+  WHERE gallery_id = ? AND status = 'approved' AND kind = 'photo'`;
 
 // POST /api/gallery/:slug/auth — password check, sets session cookie
 publicApi.post('/:slug/auth', async (c) => {

@@ -58,8 +58,8 @@ async function markZipStale(
 adminApi.get('/galleries', async (c) => {
   const rows = await c.env.DB.prepare(
     `SELECT g.id, g.slug, g.title, g.password, g.deleted_at, g.created_at,
-            (SELECT COUNT(*) FROM assets a WHERE a.gallery_id = g.id) AS photo_count,
-            (SELECT COALESCE(SUM(a.size_bytes), 0) FROM assets a WHERE a.gallery_id = g.id) AS size_bytes
+            (SELECT COUNT(*) FROM assets a WHERE a.gallery_id = g.id AND a.kind = 'photo') AS photo_count,
+            (SELECT COALESCE(SUM(a.size_bytes), 0) FROM assets a WHERE a.gallery_id = g.id AND a.kind = 'photo') AS size_bytes
      FROM galleries g ORDER BY g.created_at DESC`,
   ).all<AdminGallerySummary>();
   return c.json(rows.results);
@@ -96,10 +96,10 @@ adminApi.get('/galleries/:id', async (c) => {
   const id = c.req.param('id');
   const gallery = await c.env.DB.prepare(`SELECT * FROM galleries WHERE id = ?`)
     .bind(id)
-    .first<Omit<AdminGalleryDetail, 'subgalleries' | 'photos' | 'zips' | 'bucket_url'>>();
+    .first<Omit<AdminGalleryDetail, 'subgalleries' | 'photos' | 'zips' | 'bucket_url' | 'cover_is_splash'>>();
   if (!gallery) return c.json({ error: 'not_found' }, 404);
 
-  const [subs, photos, zips] = await Promise.all([
+  const [subs, photos, zips, coverAsset] = await Promise.all([
     c.env.DB.prepare(
       `SELECT s.id, s.gallery_id, s.slug, s.title, s.sort_order, s.cover_photo_id, s.deleted_at,
               (SELECT COUNT(*) FROM assets a WHERE a.subgallery_id = s.id) AS photo_count
@@ -109,8 +109,9 @@ adminApi.get('/galleries/:id', async (c) => {
       .bind(id)
       .all<AdminSubgallery>(),
     c.env.DB.prepare(
+      // kind = 'photo' excludes a dedicated splash image set via the splash uploader.
       `SELECT id, filename, width, height, size_bytes FROM assets
-       WHERE gallery_id = ? AND subgallery_id IS NULL ORDER BY filename`,
+       WHERE gallery_id = ? AND subgallery_id IS NULL AND kind = 'photo' ORDER BY filename`,
     )
       .bind(id)
       .all<PhotoInfo>(),
@@ -120,10 +121,16 @@ adminApi.get('/galleries/:id', async (c) => {
     )
       .bind(id)
       .all<AdminZip>(),
+    gallery.cover_photo_id
+      ? c.env.DB.prepare(`SELECT kind FROM assets WHERE id = ?`)
+          .bind(gallery.cover_photo_id)
+          .first<{ kind: string }>()
+      : Promise.resolve(null),
   ]);
 
   const body: AdminGalleryDetail = {
     ...gallery,
+    cover_is_splash: coverAsset?.kind === 'splash',
     bucket_url: c.env.PUBLIC_BUCKET_URL,
     subgalleries: subs.results,
     photos: photos.results,
@@ -346,13 +353,16 @@ adminApi.post('/subgalleries/:id/purge', async (c) => {
 // ---- Photos ----
 
 // POST /api/admin/photos — multipart: file, thumb, gallery_id, subgallery_id?,
-// width, height. R2 first, D1 second; R2 objects deleted on insert failure (§12).
+// width, height, kind? ('photo' | 'splash'). R2 first, D1 second; R2 objects
+// deleted on insert failure (§12). kind = 'splash' is a dedicated splash-page
+// image: it's excluded from every grid/zip/count query and never downloadable.
 adminApi.post('/photos', async (c) => {
   const form = await c.req.formData();
   const file = form.get('file');
   const thumb = form.get('thumb');
   const galleryId = form.get('gallery_id');
   const subRaw = form.get('subgallery_id');
+  const kindRaw = form.get('kind');
   const width = Number(form.get('width'));
   const height = Number(form.get('height'));
 
@@ -361,7 +371,8 @@ adminApi.post('/photos', async (c) => {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
     return badRequest('width and height required');
   }
-  const subgalleryId = typeof subRaw === 'string' && subRaw !== '' ? subRaw : null;
+  const kind = kindRaw === 'splash' ? 'splash' : 'photo';
+  const subgalleryId = kind === 'splash' ? null : typeof subRaw === 'string' && subRaw !== '' ? subRaw : null;
   const filename = file.name;
   if (!filename) return badRequest('filename missing');
 
@@ -380,11 +391,13 @@ adminApi.post('/photos', async (c) => {
     if (!sub) return badRequest('sub-gallery not found');
   }
 
-  // Duplicate check (§12): filename + size within the target scope.
+  // Duplicate check (§12): filename + size within the target scope + kind —
+  // a splash upload should never be silently skipped because a real photo
+  // happens to share its name and size, or vice versa.
   const dupe = await c.env.DB.prepare(
-    `SELECT id FROM assets WHERE gallery_id = ? AND subgallery_id IS ? AND filename = ? AND size_bytes = ?`,
+    `SELECT id FROM assets WHERE gallery_id = ? AND subgallery_id IS ? AND filename = ? AND size_bytes = ? AND kind = ?`,
   )
-    .bind(galleryId, subgalleryId, filename, file.size)
+    .bind(galleryId, subgalleryId, filename, file.size, kind)
     .first();
   if (dupe) {
     const result: UploadResult = { skipped: true };
@@ -402,10 +415,10 @@ adminApi.post('/photos', async (c) => {
 
   try {
     await c.env.DB.prepare(
-      `INSERT INTO assets (id, gallery_id, subgallery_id, filename, width, height, size_bytes, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO assets (id, gallery_id, subgallery_id, filename, width, height, size_bytes, created_at, kind)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(id, galleryId, subgalleryId, filename, width, height, file.size, now())
+      .bind(id, galleryId, subgalleryId, filename, width, height, file.size, now(), kind)
       .run();
   } catch (e) {
     // Orphan prevention (§12): the D1 insert failed, remove the R2 objects.
@@ -413,9 +426,11 @@ adminApi.post('/photos', async (c) => {
     throw e;
   }
 
-  await markZipStale(c.env.DB, galleryId, subgalleryId);
-  if (subgalleryId && gallery.zip_includes_subs) {
-    await markZipStale(c.env.DB, galleryId, null);
+  if (kind === 'photo') {
+    await markZipStale(c.env.DB, galleryId, subgalleryId);
+    if (subgalleryId && gallery.zip_includes_subs) {
+      await markZipStale(c.env.DB, galleryId, null);
+    }
   }
 
   const result: UploadResult = { id };
@@ -425,15 +440,17 @@ adminApi.post('/photos', async (c) => {
 adminApi.delete('/photos/:id', async (c) => {
   const id = c.req.param('id');
   const photo = await c.env.DB.prepare(
-    `SELECT id, gallery_id, subgallery_id FROM assets WHERE id = ?`,
+    `SELECT id, gallery_id, subgallery_id, kind FROM assets WHERE id = ?`,
   )
     .bind(id)
-    .first<{ id: string; gallery_id: string; subgallery_id: string | null }>();
+    .first<{ id: string; gallery_id: string; subgallery_id: string | null; kind: string }>();
   if (!photo) return c.json({ error: 'not_found' }, 404);
 
   await c.env.DB.prepare(`DELETE FROM assets WHERE id = ?`).bind(id).run();
   await c.env.BUCKET.delete([`p/${id}/f.jpg`, `p/${id}/t.jpg`]);
-  await markZipStale(c.env.DB, photo.gallery_id, photo.subgallery_id);
+  if (photo.kind === 'photo') {
+    await markZipStale(c.env.DB, photo.gallery_id, photo.subgallery_id);
+  }
   return c.json({ ok: true });
 });
 
@@ -464,7 +481,7 @@ adminApi.post('/galleries/:id/zips/rebuild', async (c) => {
 
   const counts = await c.env.DB.prepare(
     `SELECT subgallery_id, COUNT(*) AS n FROM assets
-     WHERE gallery_id = ? AND status = 'approved' GROUP BY subgallery_id`,
+     WHERE gallery_id = ? AND status = 'approved' AND kind = 'photo' GROUP BY subgallery_id`,
   )
     .bind(galleryId)
     .all<{ subgallery_id: string | null; n: number }>();
@@ -530,8 +547,8 @@ adminApi.get('/stats', async (c) => {
   const row = await c.env.DB.prepare(
     `SELECT
        (SELECT COUNT(*) FROM galleries WHERE deleted_at IS NULL) AS gallery_count,
-       (SELECT COUNT(*) FROM assets) AS photo_count,
-       (SELECT COALESCE(SUM(size_bytes), 0) FROM assets) AS photo_bytes,
+       (SELECT COUNT(*) FROM assets WHERE kind = 'photo') AS photo_count,
+       (SELECT COALESCE(SUM(size_bytes), 0) FROM assets WHERE kind = 'photo') AS photo_bytes,
        (SELECT COALESCE(SUM(size_bytes), 0) FROM zips WHERE status = 'ready') AS zip_bytes`,
   ).first<{
     gallery_count: number;

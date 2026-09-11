@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatBytes } from '../api';
 import type { AdminGalleryDetail, AdminSubgallery, PhotoInfo } from '../../shared/types';
 import { slugify } from './AdminApp';
 import { UploadPanel } from './UploadPanel';
 import { AdminPhotoGrid } from './AdminPhotoGrid';
+import { uploadSplashImage } from './uploader';
 
 export function GalleryEditor() {
   const { id = '' } = useParams();
@@ -25,6 +26,7 @@ export function GalleryEditor() {
       <SettingsCard detail={detail} onSaved={reload} />
       <ShareCard detail={detail} />
       <UploadPanel galleryId={detail.id} subgalleries={detail.subgalleries} onChanged={reload} />
+      <SplashCard detail={detail} onChanged={reload} />
       <SubgalleriesCard detail={detail} onChanged={reload} />
       {detail.photos.length > 0 && (
         <div className="card">
@@ -172,6 +174,88 @@ function ShareCard({ detail }: { detail: AdminGalleryDetail }) {
           fine for team emails, avoid for anything sensitive.
         </p>
       )}
+    </div>
+  );
+}
+
+function SplashCard({ detail, onChanged }: { detail: AdminGalleryDetail; onChanged: () => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const upload = async (file: File) => {
+    setError(null);
+    setProgress(0);
+    const previousCoverId = detail.cover_photo_id;
+    const previousWasSplash = detail.cover_is_splash;
+    try {
+      const { id } = await uploadSplashImage(detail.id, file, setProgress);
+      await api.updateGallery(detail.id, { cover_photo_id: id });
+      // The old splash image (if any) isn't referenced anywhere else — clean it up.
+      // A real photo used as the cover is left alone; it's still a gallery photo.
+      if (previousCoverId && previousWasSplash) {
+        await api.deletePhoto(previousCoverId);
+      }
+      onChanged();
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    }
+    setProgress(null);
+  };
+
+  const clear = () => {
+    const previousCoverId = detail.cover_photo_id;
+    const previousWasSplash = detail.cover_is_splash;
+    void api.updateGallery(detail.id, { cover_photo_id: null }).then(async () => {
+      if (previousCoverId && previousWasSplash) {
+        await api.deletePhoto(previousCoverId);
+      }
+      onChanged();
+    });
+  };
+
+  return (
+    <div className="card">
+      <h2>Splash image</h2>
+      <p className="muted" style={{ marginTop: '-0.4rem', fontSize: '0.85rem' }}>
+        The full-screen photo shown before clients enter the gallery. Upload a dedicated image here
+        if you don't want it to appear in the photo grid or be included in downloads — or pick an
+        existing photo below instead.
+      </p>
+      {detail.cover_photo_id && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          <img
+            src={`${detail.bucket_url}/p/${detail.cover_photo_id}/t.jpg`}
+            alt="Current splash"
+            style={{ width: '5rem', height: '5rem', objectFit: 'cover', borderRadius: 6 }}
+          />
+          <div>
+            <div style={{ fontSize: '0.85rem' }}>
+              {detail.cover_is_splash ? 'Dedicated splash image (not downloadable)' : 'Using a gallery photo'}
+            </div>
+            <button className="btn btn-sm" onClick={clear}>
+              Clear splash image
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="row-actions">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) void upload(file);
+          }}
+        />
+        <button className="btn" disabled={progress !== null} onClick={() => inputRef.current?.click()}>
+          {progress !== null ? `Uploading… ${Math.round(progress * 100)}%` : 'Upload dedicated splash image'}
+        </button>
+        {error && <span className="error-text" style={{ fontSize: '0.85rem' }}>{error}</span>}
+      </div>
     </div>
   );
 }

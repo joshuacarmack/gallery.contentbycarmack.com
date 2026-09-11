@@ -88,6 +88,7 @@ export interface AdminGalleryDetail {
   shoot_date: string | null;
   password: string | null;
   cover_photo_id: string | null;
+  cover_is_splash: boolean; // true when cover_photo_id is a dedicated splash upload, not a real photo
   zip_includes_subs: number;
   deleted_at: number | null;
   created_at: number;
