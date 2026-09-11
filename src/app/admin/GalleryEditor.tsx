@@ -40,6 +40,7 @@ export function GalleryEditor() {
             onSetGalleryCover={(pid) =>
               void api.updateGallery(detail.id, { cover_photo_id: pid }).then(reload)
             }
+            galleryCoverPhotoId={detail.cover_photo_id}
           />
         </div>
       )}
@@ -279,7 +280,12 @@ function SubRow({
           {expanded ? '▾' : '▸'} {sub.title}{' '}
           <span className="muted" style={{ fontWeight: 400, fontSize: '0.85rem' }}>
             /{sub.slug} · {sub.photo_count} photos
-          </span>
+          </span>{' '}
+          {sub.cover_photo_id ? (
+            <span className="pill ready" style={{ fontSize: '0.72rem' }}>cover set</span>
+          ) : (
+            <span className="pill stale" style={{ fontSize: '0.72rem' }}>no cover</span>
+          )}
         </strong>
         <button className="btn btn-sm" disabled={!canUp} onClick={onMoveUp} aria-label="Move up">↑</button>
         <button className="btn btn-sm" disabled={!canDown} onClick={onMoveDown} aria-label="Move down">↓</button>
@@ -313,6 +319,8 @@ function SubRow({
               onSetSubCover={(pid) =>
                 void api.updateSubgallery(sub.id, { cover_photo_id: pid }).then(onChanged)
               }
+              galleryCoverPhotoId={detail.cover_photo_id}
+              subCoverPhotoId={sub.cover_photo_id}
             />
           )}
         </div>

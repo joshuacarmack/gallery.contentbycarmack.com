@@ -8,9 +8,19 @@ interface Props {
   onDeleted: () => void;
   onSetGalleryCover: (photoId: string) => void;
   onSetSubCover?: (photoId: string) => void; // present when rendering a sub-gallery grid
+  galleryCoverPhotoId?: string | null; // highlights the gallery's splash photo, if present in this grid
+  subCoverPhotoId?: string | null; // highlights the sub-gallery's cover photo, if present in this grid
 }
 
-export function AdminPhotoGrid({ photos, bucketUrl, onDeleted, onSetGalleryCover, onSetSubCover }: Props) {
+export function AdminPhotoGrid({
+  photos,
+  bucketUrl,
+  onDeleted,
+  onSetGalleryCover,
+  onSetSubCover,
+  galleryCoverPhotoId,
+  subCoverPhotoId,
+}: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
@@ -68,17 +78,32 @@ export function AdminPhotoGrid({ photos, bucketUrl, onDeleted, onSetGalleryCover
         </div>
       )}
       <div className="admin-photo-grid">
-        {photos.map((p) => (
-          <div
-            key={p.id}
-            className={`admin-photo${selected.has(p.id) ? ' selected' : ''}`}
-            title={p.filename}
-            onClick={() => toggle(p.id)}
-          >
-            <img src={`${bucketUrl}/p/${p.id}/t.jpg`} alt={p.filename} loading="lazy" />
-            {selected.has(p.id) && <div className="check">✓</div>}
-          </div>
-        ))}
+        {photos.map((p) => {
+          const isGalleryCover = p.id === galleryCoverPhotoId;
+          const isSubCover = p.id === subCoverPhotoId;
+          const badges = [
+            isGalleryCover ? 'Splash' : null,
+            isSubCover ? 'Cover' : null,
+          ].filter(Boolean) as string[];
+          return (
+            <div
+              key={p.id}
+              className={`admin-photo${selected.has(p.id) ? ' selected' : ''}${badges.length ? ' is-cover' : ''}`}
+              title={p.filename}
+              onClick={() => toggle(p.id)}
+            >
+              <img src={`${bucketUrl}/p/${p.id}/t.jpg`} alt={p.filename} loading="lazy" />
+              {badges.length > 0 && (
+                <div className="cover-badges">
+                  {badges.map((b) => (
+                    <span key={b} className="cover-badge">★ {b}</span>
+                  ))}
+                </div>
+              )}
+              {selected.has(p.id) && <div className="check">✓</div>}
+            </div>
+          );
+        })}
       </div>
     </>
   );
